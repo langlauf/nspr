@@ -1,7 +1,7 @@
-/Makefile/3.35/Mon Aug 14 22:05:15 2000//TNSPRPUB_RELEASE_4_1_1
-/Makefile.in/1.14/Mon Aug 14 22:05:16 2000//TNSPRPUB_RELEASE_4_1_1
-/nspr.rc/3.10/Tue Jun 20 21:25:46 2000//TNSPRPUB_RELEASE_4_1_1
-/prvrsion.c/3.12/Tue Jun 20 21:25:49 2000//TNSPRPUB_RELEASE_4_1_1
+/Makefile/3.35/Mon Aug 14 22:05:15 2000//TNSPRPUB_RELEASE_4_1_2
+/Makefile.in/1.14/Mon Aug 14 22:05:16 2000//TNSPRPUB_RELEASE_4_1_2
+/nspr.rc/3.10/Tue Jun 20 21:25:46 2000//TNSPRPUB_RELEASE_4_1_2
+/prvrsion.c/3.12/Tue Jun 20 21:25:49 2000//TNSPRPUB_RELEASE_4_1_2
 D/bthreads////
 D/cplus////
 D/io////
