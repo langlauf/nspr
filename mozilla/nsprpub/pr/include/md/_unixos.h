@@ -43,7 +43,7 @@
  * Linux: FD_SETSIZE is defined in /usr/include/sys/select.h and should
  * not be redefined.
  */
-#if !defined(LINUX) && !defined(RHAPSODY) && !defined(NEXTSTEP)
+#if !defined(LINUX) && !defined(DARWIN) && !defined(NEXTSTEP)
 #ifndef FD_SETSIZE
 #define FD_SETSIZE  4096
 #endif
@@ -145,6 +145,9 @@ extern PRUint32 _pr_md_ioq_timeout;
 
 struct _MDFileDesc {
     int osfd;
+#if defined(LINUX) && defined(_PR_PTHREADS)
+    int tcp_nodelay;  /* used by pt_LinuxSendFile */
+#endif
 };
 
 struct _MDDir {
@@ -165,7 +168,7 @@ extern void _MD_unix_init_running_cpu(struct _PRCPU *cpu);
 #define PROT_NONE 0x0
 #endif
 
-#if defined(DEBUG) && !defined(RHAPSODY) && !defined(NEXTSTEP)
+#if defined(DEBUG) && !defined(DARWIN) && !defined(NEXTSTEP)
 #if !defined(SOLARIS)	
 #include <string.h>  /* for memset() */
 #define _MD_INIT_STACK(ts,REDZONE)					\

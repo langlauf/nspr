@@ -383,6 +383,14 @@ void _MD_unix_map_rmdir_error(int err)
     PRErrorCode prError;
 
     switch (err) {
+        /*
+         * On AIX 4.3, ENOTEMPTY is defined as EEXIST.
+         */
+#if ENOTEMPTY != EEXIST
+        case ENOTEMPTY:
+            prError = PR_DIRECTORY_NOT_EMPTY_ERROR;
+            break;
+#endif
         case EEXIST:
             prError = PR_DIRECTORY_NOT_EMPTY_ERROR;
             break;
@@ -839,3 +847,10 @@ void _MD_solaris_map_sendfile_error(int err)
     _MD_unix_map_default_error(err) ;
 }
 #endif /* SOLARIS */
+
+#ifdef LINUX
+void _MD_linux_map_sendfile_error(int err)
+{
+    _MD_unix_map_default_error(err) ;
+}
+#endif /* LINUX */

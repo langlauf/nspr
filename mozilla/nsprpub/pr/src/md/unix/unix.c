@@ -69,7 +69,7 @@
 #elif defined(IRIX) || defined(HPUX) || defined(OSF1) || defined(SOLARIS) \
     || defined(AIX4_1) || defined(LINUX) || defined(SONY) \
     || defined(BSDI) || defined(SCO) || defined(NEC) || defined(SNI) \
-    || defined(SUNOS4) || defined(NCR) || defined(RHAPSODY) \
+    || defined(SUNOS4) || defined(NCR) || defined(DARWIN) \
     || defined(NEXTSTEP) || defined(QNX)
 #define _PRSockLen_t int
 #elif (defined(AIX) && !defined(AIX4_1)) || defined(FREEBSD) \
@@ -514,6 +514,7 @@ static PRInt32 socket_io_wait(PRInt32 osfd, PRInt32 fd_type,
     struct timeval tv;
     PRThread *me = _PR_MD_CURRENT_THREAD();
     PRIntervalTime epoch, now, elapsed, remaining;
+    PRBool wait_for_remaining;
     PRInt32 syserror;
     fd_set rd_wr;
 
@@ -558,8 +559,10 @@ static PRInt32 socket_io_wait(PRInt32 osfd, PRInt32 fd_type,
                  * so that there is an upper limit on the delay
                  * before the interrupt bit is checked.
                  */
+                wait_for_remaining = PR_TRUE;
                 tv.tv_sec = PR_IntervalToSeconds(remaining);
                 if (tv.tv_sec > _PR_INTERRUPT_CHECK_INTERVAL_SECS) {
+                    wait_for_remaining = PR_FALSE;
                     tv.tv_sec = _PR_INTERRUPT_CHECK_INTERVAL_SECS;
                     tv.tv_usec = 0;
                 } else {
@@ -596,8 +599,12 @@ static PRInt32 socket_io_wait(PRInt32 osfd, PRInt32 fd_type,
                      * PR_IntervalNow() call.
                      */
                     if (rv == 0) {
-                        now += PR_SecondsToInterval(tv.tv_sec)
-                            + PR_MicrosecondsToInterval(tv.tv_usec);
+                        if (wait_for_remaining) {
+                            now += remaining;
+                        } else {
+                            now += PR_SecondsToInterval(tv.tv_sec)
+                                + PR_MicrosecondsToInterval(tv.tv_usec);
+                        }
                     } else {
                         now = PR_IntervalNow();
                     }
@@ -625,6 +632,7 @@ static PRInt32 socket_io_wait(PRInt32 osfd, PRInt32 fd_type,
     int msecs;
     PRThread *me = _PR_MD_CURRENT_THREAD();
     PRIntervalTime epoch, now, elapsed, remaining;
+    PRBool wait_for_remaining;
     PRInt32 syserror;
     struct pollfd pfd;
 
@@ -682,8 +690,10 @@ static PRInt32 socket_io_wait(PRInt32 osfd, PRInt32 fd_type,
                  * so that there is an upper limit on the delay
                  * before the interrupt bit is checked.
                  */
+                wait_for_remaining = PR_TRUE;
                 msecs = PR_IntervalToMilliseconds(remaining);
                 if (msecs > _PR_INTERRUPT_CHECK_INTERVAL_SECS * 1000) {
+                    wait_for_remaining = PR_FALSE;
                     msecs = _PR_INTERRUPT_CHECK_INTERVAL_SECS * 1000;
                 }
                 rv = _MD_POLL(&pfd, 1, msecs);
@@ -719,7 +729,11 @@ static PRInt32 socket_io_wait(PRInt32 osfd, PRInt32 fd_type,
                      * PR_IntervalNow() call.
                      */
                     if (rv == 0) {
-                        now += PR_MillisecondsToInterval(msecs);
+                        if (wait_for_remaining) {
+                            now += remaining;
+                        } else {
+                            now += PR_MillisecondsToInterval(msecs);
+                        }
                     } else {
                         now = PR_IntervalNow();
                     }
@@ -1055,7 +1069,7 @@ PRInt32 _MD_accept(PRFileDesc *fd, PRNetAddr *addr,
     while ((rv = accept(osfd, (struct sockaddr *) addr,
                                         (_PRSockLen_t *)addrlen)) == -1) {
         err = _MD_ERRNO();
-        if ((err == EAGAIN) || (err == EWOULDBLOCK)) {
+        if ((err == EAGAIN) || (err == EWOULDBLOCK) || (err == ECONNABORTED)) {
             if (fd->secret->nonblocking) {
                 break;
             }

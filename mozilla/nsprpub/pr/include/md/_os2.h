@@ -47,6 +47,33 @@
 
 #include <errno.h>
 
+#define USE_RAMSEM
+
+#ifdef USE_RAMSEM
+#pragma pack(4)
+
+#pragma pack(2)
+typedef struct _RAMSEM
+{
+   ULONG   ulTIDPID;
+   ULONG   hevSem;
+   ULONG   cLocks;
+   USHORT  cWaiting;
+   USHORT  cPosts;
+} RAMSEM, *PRAMSEM;
+
+typedef struct _CRITICAL_SECTION
+{
+    ULONG ulReserved[4]; /* Same size as RAMSEM */
+} CRITICAL_SECTION, *PCRITICAL_SECTION, *LPCRITICAL_SECTION;
+#pragma pack(4)
+
+VOID    APIENTRY DeleteCriticalSection(PCRITICAL_SECTION);
+VOID    APIENTRY EnterCriticalSection(PCRITICAL_SECTION);
+VOID    APIENTRY InitializeCriticalSection(PCRITICAL_SECTION);
+VOID    APIENTRY LeaveCriticalSection(PCRITICAL_SECTION);
+#endif
+
 #ifdef XP_OS2_EMX
 /*
  * EMX-specific tweaks:
@@ -71,7 +98,7 @@
 
 #define HAVE_DLL
 #undef  HAVE_THREAD_AFFINITY
-#undef  _PR_HAVE_ATOMIC_OPS
+#define _PR_HAVE_ATOMIC_OPS
 
 #define HANDLE unsigned long
 #define HINSTANCE HMODULE
@@ -96,17 +123,16 @@ typedef int (*FARPROC)();
 #define _MD_MAGIC_DIR		0x55555555
 #define _MD_MAGIC_CV        0x66666666
 
-typedef struct _MDSemaphore
-{
+struct _MDSemaphore {
    HEV sem;
-} MDSEM;
+};
 
 struct _MDCPU {
     int              unused;
 }; 
 
 struct _MDThread {
-    MDSEM            blocked_sema;       /* Threads block on this when waiting
+    HEV              blocked_sema;      /* Threads block on this when waiting
                                          * for IO or CondVar.
                                          */
     PRBool           inCVWaitQueue;     /* PR_TRUE if the thread is in the
@@ -163,7 +189,11 @@ struct _MDNotified {
 };
 
 struct _MDLock {
-    HMTX mutex;          /* this is recursive on NT */
+#ifdef USE_RAMSEM
+    CRITICAL_SECTION mutex;            /* this is recursive on NT */
+#else
+    HMTX mutex;                        /* this is recursive on NT */
+#endif
 
     /*
      * When notifying cvars, there is no point in actually
@@ -259,7 +289,7 @@ extern void _MD_MakeNonblock(PRFileDesc *f);
 #define _MD_INIT_FD_INHERITABLE       (_PR_MD_INIT_FD_INHERITABLE)
 #define _MD_QUERY_FD_INHERITABLE      (_PR_MD_QUERY_FD_INHERITABLE)
 #define _MD_SHUTDOWN                  (_PR_MD_SHUTDOWN)
-#define _MD_LISTEN(s, backlog)        listen(s->secret->md.osfd,backlog)
+#define _MD_LISTEN                    _PR_MD_LISTEN
 extern PRInt32 _MD_CloseSocket(PRInt32 osfd);
 #define _MD_CLOSE_SOCKET              _MD_CloseSocket
 #define _MD_SENDTO                    (_PR_MD_SENDTO)
@@ -269,15 +299,22 @@ extern PRInt32 _MD_CloseSocket(PRInt32 osfd);
 #define _MD_GETPEERNAME               (_PR_MD_GETPEERNAME)
 #define _MD_GETSOCKOPT                (_PR_MD_GETSOCKOPT)
 #define _MD_SETSOCKOPT                (_PR_MD_SETSOCKOPT)
+
+#ifdef XP_OS2_EMX
+extern PRInt32 _MD_SELECT(int nfds, fd_set *readfds, fd_set *writefds,
+                                    fd_set *exceptfds, struct timeval *timeout);
+#else
 #define _MD_SELECT                    select
+#endif
+
 #define _MD_FSYNC                     _PR_MD_FSYNC
 #define _MD_SET_FD_INHERITABLE        (_PR_MD_SET_FD_INHERITABLE)
 
-#define _MD_INIT_ATOMIC               _PR_MD_INIT_ATOMIC
-#define _MD_ATOMIC_INCREMENT(x)       _PR_MD_ATOMIC_INCREMENT(x)
-#define _MD_ATOMIC_ADD(x,y)			  _PR_MD_ATOMIC_ADD(x,y)
-#define _MD_ATOMIC_DECREMENT(x)       _PR_MD_ATOMIC_DECREMENT(x)
-#define _MD_ATOMIC_SET(x,y)           _PR_MD_ATOMIC_SET(x, y)
+#define _MD_INIT_ATOMIC()
+#define _MD_ATOMIC_INCREMENT          _PR_MD_ATOMIC_INCREMENT
+#define _MD_ATOMIC_ADD                _PR_MD_ATOMIC_ADD
+#define _MD_ATOMIC_DECREMENT          _PR_MD_ATOMIC_DECREMENT
+#define _MD_ATOMIC_SET                _PR_MD_ATOMIC_SET
 
 #define _MD_INIT_IO                   (_PR_MD_INIT_IO)
 #define _MD_PR_POLL                   (_PR_MD_PR_POLL)
@@ -319,7 +356,7 @@ extern PRInt32 _MD_Accept(PRFileDesc *fd, PRNetAddr *raddr, PRUint32 *rlen,
 #define _MD_PUT_ENV                 (_PR_MD_PUT_ENV)
 
 /* --- Threading Stuff --- */
-#define _MD_DEFAULT_STACK_SIZE      32767L
+#define _MD_DEFAULT_STACK_SIZE      65536L
 #define _MD_INIT_THREAD             (_PR_MD_INIT_THREAD)
 #define _MD_INIT_ATTACHED_THREAD    (_PR_MD_INIT_THREAD)
 #define _MD_CREATE_THREAD           (_PR_MD_CREATE_THREAD)
@@ -343,10 +380,10 @@ extern PRInt32 _MD_Accept(PRFileDesc *fd, PRNetAddr *raddr, PRUint32 *rlen,
 #define _PR_LOCK                      _MD_LOCK
 #define _PR_UNLOCK					  _MD_UNLOCK
 
-#define _MD_NEW_LOCK(lock)            (DosCreateMutexSem(0, &((lock)->mutex), 0, 0),(lock)->notified.length=0,(lock)->notified.link=NULL,PR_SUCCESS)
-#define _MD_FREE_LOCK(lock)           DosCloseMutexSem(((lock)->mutex))
-#define _MD_LOCK(lock)                DosRequestMutexSem(((lock)->mutex), SEM_INDEFINITE_WAIT)
-#define _MD_TEST_AND_LOCK(lock)       (DosRequestMutexSem(((lock)->mutex), SEM_INDEFINITE_WAIT),PR_SUCCESS)
+#define _MD_NEW_LOCK                  (_PR_MD_NEW_LOCK)
+#define _MD_FREE_LOCK                 (_PR_MD_FREE_LOCK)
+#define _MD_LOCK                      (_PR_MD_LOCK)
+#define _MD_TEST_AND_LOCK             (_PR_MD_TEST_AND_LOCK)
 #define _MD_UNLOCK                    (_PR_MD_UNLOCK)
 
 /* --- lock and cv waiting --- */
@@ -531,4 +568,6 @@ unsigned long _System _DLL_InitTerm( unsigned long mod_handle, unsigned long fla
 #define FreeLibrary(x) DosFreeModule((HMODULE)x)
 #define OutputDebugString(x)
                                
+extern int _MD_os2_get_nonblocking_connect_error(int osfd);
+
 #endif /* nspr_os2_defs_h___ */

@@ -43,16 +43,12 @@
 #include <signal.h>
 #endif
 
-/* --- Declare these to avoid "implicit" warnings --- */
-PR_EXTERN(void) _PR_MD_NEW_SEM(_MDSemaphore *md, PRUintn value);
-PR_EXTERN(void) _PR_MD_DESTROY_SEM(_MDSemaphore *md);
-
 /* --- globals ------------------------------------------------ */
 _NSPR_TLS*        pThreadLocalStorage = 0;
 _PRInterruptTable             _pr_interruptTable[] = { { 0 } };
 APIRET (* APIENTRY QueryThreadContext)(TID, ULONG, PCONTEXTRECORD);
 
-PR_IMPLEMENT(void)
+void
 _PR_MD_ENSURE_TLS(void)
 {
    if(!pThreadLocalStorage)
@@ -66,7 +62,7 @@ _PR_MD_ENSURE_TLS(void)
    }
 }
 
-PR_IMPLEMENT(void)
+void
 _PR_MD_EARLY_INIT()
 {
    HMODULE hmod;
@@ -93,9 +89,10 @@ _pr_SetThreadMDHandle(PRThread *thread)
 }
 
 
-PR_IMPLEMENT(PRStatus)
+PRStatus
 _PR_MD_INIT_THREAD(PRThread *thread)
 {
+   APIRET rv;
 #ifdef XP_OS2_EMX
    /* disable SIGPIPE */
    struct sigaction sa;
@@ -110,11 +107,11 @@ _PR_MD_INIT_THREAD(PRThread *thread)
    }
 
    /* Create the blocking IO semaphore */
-   _PR_MD_NEW_SEM(&thread->md.blocked_sema, 1);
-   return (thread->md.blocked_sema.sem != 0) ? PR_SUCCESS : PR_FAILURE;
+   rv = DosCreateEventSem(NULL, &(thread->md.blocked_sema), 0, 0);
+   return (rv == NO_ERROR) ? PR_SUCCESS : PR_FAILURE;
 }
 
-PR_IMPLEMENT(PRStatus) 
+PRStatus
 _PR_MD_CREATE_THREAD(PRThread *thread, 
                   void (*start)(void *), 
                   PRThreadPriority priority, 
@@ -135,14 +132,14 @@ _PR_MD_CREATE_THREAD(PRThread *thread,
     return PR_SUCCESS;
 }
 
-PR_IMPLEMENT(void)    
+void
 _PR_MD_YIELD(void)
 {
     /* Isn't there some problem with DosSleep(0) on OS/2? */
     DosSleep(0);
 }
 
-PR_IMPLEMENT(void)     
+void
 _PR_MD_SET_PRIORITY(_MDThread *thread, PRThreadPriority newPri)
 {
     int nativePri;
@@ -175,48 +172,31 @@ _PR_MD_SET_PRIORITY(_MDThread *thread, PRThreadPriority newPri)
     return;
 }
 
-PR_IMPLEMENT(void)
+void
 _PR_MD_CLEAN_THREAD(PRThread *thread)
 {
-	if (&thread->md.blocked_sema) {
-	  _PR_MD_DESTROY_SEM(&thread->md.blocked_sema);
-	}
-	
-	if (thread->md.handle) {
-	  DosKillThread(thread->md.handle);
-	  thread->md.handle = 0;
-	}
-}
+    APIRET rv;
 
-PR_IMPLEMENT(void)
-_PR_MD_EXIT_THREAD(PRThread *thread)
-{
-    _PR_MD_DESTROY_SEM(&thread->md.blocked_sema);
-
-    if (thread->md.handle) {
-       /* DosKillThread will not kill a suspended thread, but it will mark it
-        * for death; we must resume it after killing it to make sure it knows
-        * it is about to die (pretty wicked, huh?).
-        *
-        * DosKillThread will not kill the current thread, instead we must use
-        * DosExit.
-        */
-       if ( thread != _MD_CURRENT_THREAD() ) {
-           DosKillThread( thread->md.handle );
-           DosResumeThread( thread->md.handle );
-       } else {
-#ifndef XP_OS2_EMX
-           _endthread();
-#endif
-       }
-       thread->md.handle = 0;
+    if (thread->md.blocked_sema) {
+        rv = DosCloseEventSem(thread->md.blocked_sema);
+        PR_ASSERT(rv == NO_ERROR);
+        thread->md.blocked_sema = 0;
     }
 
+    if (thread->md.handle) {
+        thread->md.handle = 0;
+    }
+}
+
+void
+_PR_MD_EXIT_THREAD(PRThread *thread)
+{
+    _PR_MD_CLEAN_THREAD(thread);
     _PR_MD_SET_CURRENT_THREAD(NULL);
 }
 
 
-PR_IMPLEMENT(void)
+void
 _PR_MD_EXIT(PRIntn status)
 {
     _exit(status);
@@ -256,19 +236,19 @@ _PR_MD_GETTHREADAFFINITYMASK(PRThread *thread, PRUint32 *mask)
 }
 #endif /* HAVE_THREAD_AFFINITY */
 
-PR_IMPLEMENT(void) 
+void
 _PR_MD_SUSPEND_CPU(_PRCPU *cpu) 
 {
     _PR_MD_SUSPEND_THREAD(cpu->thread);
 }
 
-PR_IMPLEMENT(void)
+void
 _PR_MD_RESUME_CPU(_PRCPU *cpu)
 {
     _PR_MD_RESUME_THREAD(cpu->thread);
 }
 
-PR_IMPLEMENT(void)
+void
 _PR_MD_SUSPEND_THREAD(PRThread *thread)
 {
     if (_PR_IS_NATIVE_THREAD(thread)) {
@@ -282,7 +262,7 @@ _PR_MD_SUSPEND_THREAD(PRThread *thread)
     }
 }
 
-PR_IMPLEMENT(void)
+void
 _PR_MD_RESUME_THREAD(PRThread *thread)
 {
     if (_PR_IS_NATIVE_THREAD(thread)) {

@@ -96,22 +96,48 @@
 #define _PT_PTHREAD_COND_INIT(m, a)       pthread_cond_init(&(m), &(a))
 #endif
 
-/* The pthread_t handle used to identify a thread can vary in size
- * with different implementations of pthreads.  This macro defines
- * a way to get a unique identifier from the handle.  This may be
+/* The pthreads standard does not specify an invalid value for the
+ * pthread_t handle.  (0 is usually an invalid pthread identifier
+ * but there are exceptions, for example, DG/UX.)  These macros
+ * define a way to set the handle to or compare the handle with an
+ * invalid identifier.  These macros are not portable and may be
  * more of a problem as we adapt to more pthreads implementations.
+ * They are only used in the PRMonitor functions.  Do not use them
+ * in new code.
+ *
+ * Unfortunately some of our clients depend on certain properties
+ * of our PRMonitor implementation, preventing us from replacing
+ * it by a portable implementation.
+ * - High-performance servers like the fact that PR_EnterMonitor
+ *   only calls PR_Lock and PR_ExitMonitor only calls PR_Unlock.
+ *   (A portable implementation would use a PRLock and a PRCondVar
+ *   to implement the recursive lock in a monitor and call both
+ *   PR_Lock and PR_Unlock in PR_EnterMonitor and PR_ExitMonitor.)
+ *   Unfortunately this forces us to read the monitor owner field
+ *   without holding a lock.
+ * - One way to make it safe to read the monitor owner field
+ *   without holding a lock is to make that field a PRThread*
+ *   (one should be able to read a pointer with a single machine
+ *   instruction).  However, PR_GetCurrentThread calls calloc if
+ *   it is called by a thread that was not created by NSPR.  The
+ *   malloc tracing tools in the Mozilla client use PRMonitor for
+ *   locking in their malloc, calloc, and free functions.  If
+ *   PR_EnterMonitor calls any of these functions, infinite
+ *   recursion ensues.
  */
 #if defined(_PR_DCETHREADS)
-#define _PT_PTHREAD_ZERO_THR_HANDLE(t)        memset(&(t), 0, sizeof(pthread_t))
-#define _PT_PTHREAD_THR_HANDLE_IS_ZERO(t) \
+#define _PT_PTHREAD_INVALIDATE_THR_HANDLE(t) \
+	memset(&(t), 0, sizeof(pthread_t))
+#define _PT_PTHREAD_THR_HANDLE_IS_INVALID(t) \
 	(!memcmp(&(t), &pt_zero_tid, sizeof(pthread_t)))
 #define _PT_PTHREAD_COPY_THR_HANDLE(st, dt)   (dt) = (st)
 #elif defined(IRIX) || defined(OSF1) || defined(AIX) || defined(SOLARIS) \
 	|| defined(HPUX) || defined(LINUX) || defined(FREEBSD) \
 	|| defined(NETBSD) || defined(OPENBSD) || defined(BSDI) \
-	|| defined(VMS) || defined(NTO) || defined(RHAPSODY)
-#define _PT_PTHREAD_ZERO_THR_HANDLE(t)        (t) = 0
-#define _PT_PTHREAD_THR_HANDLE_IS_ZERO(t)     (t) == 0
+	|| defined(VMS) || defined(NTO) || defined(DARWIN) \
+	|| defined(UNIXWARE)
+#define _PT_PTHREAD_INVALIDATE_THR_HANDLE(t)  (t) = 0
+#define _PT_PTHREAD_THR_HANDLE_IS_INVALID(t)  (t) == 0
 #define _PT_PTHREAD_COPY_THR_HANDLE(st, dt)   (dt) = (st)
 #else 
 #error "pthreads is not supported for this architecture"
@@ -169,7 +195,7 @@
  */
 #if (defined(AIX) && !defined(AIX4_3)) || defined(LINUX) \
 	|| defined(FREEBSD) || defined(NETBSD) || defined(OPENBSD) \
-	|| defined(BSDI) || defined(VMS)
+	|| defined(BSDI) || defined(VMS) || defined(UNIXWARE)
 #define PT_NO_SIGTIMEDWAIT
 #endif
 
@@ -199,7 +225,7 @@
 #define PT_PRIO_MAX            sched_get_priority_max(SCHED_OTHER)
 #endif /* defined(_PR_DCETHREADS) */
 
-#elif defined(LINUX)
+#elif defined(LINUX) || defined(FREEBSD)
 #define PT_PRIO_MIN            sched_get_priority_min(SCHED_OTHER)
 #define PT_PRIO_MAX            sched_get_priority_max(SCHED_OTHER)
 #elif defined(NTO)
@@ -219,8 +245,8 @@
  */
 #define PT_PRIO_MIN            1
 #define PT_PRIO_MAX            127
-#elif defined(FREEBSD) || defined(NETBSD) || defined(OPENBSD) \
-	|| defined(BSDI) || defined(RHAPSODY) /* XXX */
+#elif defined(NETBSD) || defined(OPENBSD) \
+	|| defined(BSDI) || defined(DARWIN) || defined(UNIXWARE) /* XXX */
 #define PT_PRIO_MIN            0
 #define PT_PRIO_MAX            126
 #else
@@ -253,7 +279,8 @@ extern int (*_PT_aix_yield_fcn)();
     PR_END_MACRO
 #elif defined(HPUX) || defined(LINUX) || defined(SOLARIS) \
 	|| defined(FREEBSD) || defined(NETBSD) || defined(OPENBSD) \
-	|| defined(BSDI) || defined(NTO) || defined(RHAPSODY)
+	|| defined(BSDI) || defined(NTO) || defined(DARWIN) \
+	|| defined(UNIXWARE)
 #define _PT_PTHREAD_YIELD()            	sched_yield()
 #else
 #error "Need to define _PT_PTHREAD_YIELD for this platform"

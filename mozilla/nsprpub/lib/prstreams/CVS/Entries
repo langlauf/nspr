@@ -1,7 +1,7 @@
-/Makefile/3.19/Tue Jun 20 21:18:58 2000//TNSPRPUB_RELEASE_4_1_2
-/Makefile.in/1.10/Tue Jun 20 21:19:00 2000//TNSPRPUB_RELEASE_4_1_2
-/plvrsion.c/3.8/Tue Jun 20 21:19:03 2000//TNSPRPUB_RELEASE_4_1_2
-/prstrms.cpp/3.9/Tue Jun 20 21:19:04 2000//TNSPRPUB_RELEASE_4_1_2
-/prstrms.h/3.5/Tue Jun 20 21:19:07 2000//TNSPRPUB_RELEASE_4_1_2
-/prstrms.rc/3.5/Wed Aug 30 16:59:46 2000//TNSPRPUB_RELEASE_4_1_2
+/.cvsignore/1.2/Sat May 12 06:36:32 2001//TNSPR_4_2_RELEASE
+/Makefile.in/1.19/Sat Jun 23 14:42:24 2001//TNSPR_4_2_RELEASE
+/plvrsion.c/3.9/Fri Sep  7 18:27:33 2001//TNSPR_4_2_RELEASE
+/prstrms.cpp/3.9/Tue Jun 20 21:19:04 2000//TNSPR_4_2_RELEASE
+/prstrms.h/3.5/Tue Jun 20 21:19:07 2000//TNSPR_4_2_RELEASE
+/prstrms.rc/3.5/Wed Aug 30 16:59:46 2000//TNSPR_4_2_RELEASE
 D/tests////

@@ -44,6 +44,7 @@
 #define PR_DLL_SUFFIX		""
 #define _PR_LOCAL_THREADS_ONLY
 #define _PR_NO_PREEMPT	1
+#define _PR_HAVE_ATOMIC_OPS 1
 
 #include "prinit.h"
 #include "prio.h"
@@ -61,7 +62,9 @@
 
 #include <stddef.h>
 #include <setjmp.h>
+
 #include <Errors.h>
+#include <OpenTransport.h>
 
 #define _PR_HAVE_PEEK_BUFFER
 #define _PR_PEEK_BUFFER_MAX (16 * 1024)
@@ -111,19 +114,22 @@ typedef struct _MDSocketCallerInfo {
 } _MDSocketCallerInfo;
 
 struct _MDFileDesc {
-    PRInt32     osfd;
-	PRBool      connectionOpen;
-	PRBool      readReady;
-	PRBool      writeReady;
-	PRBool      exceptReady;
-	PRLock *    miscLock;
-	
-	/* Server sockets: listen bit tells the notifier func what to do */
-	PRBool		doListen;
-	
-	_MDSocketCallerInfo  misc;
-	_MDSocketCallerInfo  read;
-	_MDSocketCallerInfo  write;
+    PRInt32         osfd;
+    PRPackedBool    orderlyDisconnect;
+    PRPackedBool    readReady;
+    PRPackedBool    writeReady;
+    PRPackedBool    exceptReady;
+    PRLock *        miscLock;
+
+    /* Server sockets: listen bit tells the notifier func what to do */
+    PRBool          doListen;
+
+    /* stored error for non-blocking connects, as a Unix-style error code */
+    OTReason        disconnectError;
+
+    _MDSocketCallerInfo  misc;
+    _MDSocketCallerInfo  read;
+    _MDSocketCallerInfo  write;
 };
 
 /*
@@ -136,6 +142,23 @@ struct _MDFileDesc {
 /*
 ** Interrupts Related definitions
 */
+
+#define _MD_GET_INTSOFF()               (_pr_intsOff)
+
+#define _MD_INTSOFF(_is)                                  \
+    PR_BEGIN_MACRO                                        \
+        ENTER_CRITICAL_REGION();                          \
+        (_is) = _PR_MD_GET_INTSOFF();                     \
+        _PR_MD_SET_INTSOFF(1);                            \
+        LEAVE_CRITICAL_REGION();                          \
+    PR_END_MACRO
+
+#if TARGET_CARBON
+extern void _MD_SetIntsOff(PRInt32 ints);
+#define _MD_SET_INTSOFF(_val)           _MD_SetIntsOff(_val)
+#else /* not TARGET_CARBON */
+#define _MD_SET_INTSOFF(_val)           (_pr_intsOff = _val)
+#endif /* TARGET_CARBON */
 
 #define _MD_START_INTERRUPTS			_MD_StartInterrupts
 #define _MD_STOP_INTERRUPTS	    		_MD_StopInterrupts
@@ -237,6 +260,8 @@ extern PRStatus _MD_InitThread(PRThread *thread);
 
 /*
 ** Initialize the thread context preparing it to execute _main.
+** *sp = 0 zeros out the sp for the first stack frame so that
+** stack walking code can find the top of the stack.
 */
 #if defined(powerc) || defined(__powerc)
 #define _MD_INIT_CONTEXT(_thread, _sp, _main, _status)	\
@@ -247,6 +272,7 @@ extern PRStatus _MD_InitThread(PRThread *thread);
     *((PRBool *)_status) = PR_TRUE;              		\
 	(void) setjmp(jb);			      					\
     sp = INIT_STACKPTR(_sp);							\
+    *sp = 0;                                            \
     (_MD_GET_SP(_thread)) = (long) sp;   				\
 	tvect = (unsigned long *)_main;						\
     (_MD_GET_PC(_thread)) = (int) *tvect;   			\
@@ -624,6 +650,66 @@ extern PRStatus _MD_CloseFileMap(struct PRFileMap *fmap);
 #define _MD_CLOSE_FILE_MAP _MD_CloseFileMap
 
 extern void SetLogFileTypeCreator(const char *logFile);
-extern int _MD_mac_get_nonblocking_connect_error(PRInt32 osfd);
+extern int _MD_mac_get_nonblocking_connect_error(PRFileDesc* fd);
+
+
+/*
+ * Critical section support
+ */
+
+#define MAC_CRITICAL_REGIONS  TARGET_CARBON
+
+#if MAC_CRITICAL_REGIONS
+
+extern void InitCriticalRegion();
+extern void TermCriticalRegion();
+
+extern void EnterCritialRegion();
+extern void LeaveCritialRegion();
+
+#define INIT_CRITICAL_REGION()     InitCriticalRegion()
+#define TERM_CRITICAL_REGION()     TermCriticalRegion()
+
+#define ENTER_CRITICAL_REGION()     EnterCritialRegion()
+#define LEAVE_CRITICAL_REGION()     LeaveCritialRegion()
+
+#else
+
+#define INIT_CRITICAL_REGION()
+#define TERM_CRITICAL_REGION()
+
+#define ENTER_CRITICAL_REGION()
+#define LEAVE_CRITICAL_REGION()
+
+#endif
+
+
+
+/*
+ * CPU Idle support
+ */
+
+extern void InitIdleSemaphore();
+extern void TermIdleSemaphore();
+
+extern void WaitOnIdleSemaphore();
+extern void SignalIdleSemaphore();
+
+
+/*
+ * Atomic operations
+ */
+#ifdef _PR_HAVE_ATOMIC_OPS
+
+extern PRInt32 _MD_AtomicSet(PRInt32 *val, PRInt32 newval);
+
+#define _MD_INIT_ATOMIC()
+#define _MD_ATOMIC_INCREMENT(val)   OTAtomicAdd32(1, (SInt32 *)val)
+#define _MD_ATOMIC_ADD(ptr, val)    OTAtomicAdd32(val, (SInt32 *)ptr)
+#define _MD_ATOMIC_DECREMENT(val)   OTAtomicAdd32(-1, (SInt32 *)val)
+#define _MD_ATOMIC_SET(val, newval) _MD_AtomicSet(val, newval)
+
+#endif /* _PR_HAVE_ATOMIC_OPS */
+
 
 #endif /* prmacos_h___ */

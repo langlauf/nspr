@@ -200,7 +200,7 @@ void _PR_InitLog(void)
         PRInt32 bufSize = DEFAULT_BUF_SIZE;
         while (pos < evlen) {
             PRIntn level = 1, count = 0, delta = 0;
-            count = sscanf(&ev[pos], "%64[A-Za-z0-9]%n:%d%n",
+            count = sscanf(&ev[pos], "%64[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]%n:%d%n",
                            module, &delta, &level, &delta);
             pos += delta;
             if (count == 0) break;
@@ -261,6 +261,8 @@ void _PR_InitLog(void)
 
 void _PR_LogCleanup(void)
 {
+    PRLogModuleInfo *lm = logModules;
+
     PR_LogFlush();
 
 #ifdef _PR_USE_STDIO_FOR_LOGGING
@@ -272,6 +274,19 @@ void _PR_LogCleanup(void)
         PR_Close(logFile);
     }
 #endif
+
+    while (lm != NULL) {
+        PRLogModuleInfo *next = lm->next;
+        free((/*const*/ char *)lm->name);
+        PR_Free(lm);
+        lm = next;
+    }
+    logModules = NULL;
+
+    if (_pr_logLock) {
+        PR_DestroyLock(_pr_logLock);
+        _pr_logLock = NULL;
+    }
 }
 
 static void _PR_SetLogModuleLevel( PRLogModuleInfo *lm )
@@ -285,7 +300,7 @@ static void _PR_SetLogModuleLevel( PRLogModuleInfo *lm )
         while (pos < evlen) {
             PRIntn level = 1, count = 0, delta = 0;
 
-            count = sscanf(&ev[pos], "%64[A-Za-z0-9]%n:%d%n",
+            count = sscanf(&ev[pos], "%64[ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]%n:%d%n",
                            module, &delta, &level, &delta);
             pos += delta;
             if (count == 0) break;
@@ -351,7 +366,7 @@ PR_IMPLEMENT(PRBool) PR_SetLogFile(const char *file)
 #else
     PRFileDesc *newLogFile;
 
-    newLogFile = PR_Open(file, PR_WRONLY|PR_CREATE_FILE, 0666);
+    newLogFile = PR_Open(file, PR_WRONLY|PR_CREATE_FILE|PR_TRUNCATE, 0666);
     if (newLogFile) {
         if (logFile && logFile != _pr_stdout && logFile != _pr_stderr) {
             PR_Close(logFile);

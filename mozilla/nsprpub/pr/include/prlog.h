@@ -86,7 +86,7 @@ PR_BEGIN_EXTERN_C
 ** The special LogModule name "sync" tells the NSPR log service to do
 ** unbuffered logging.
 ** 
-** The special LogModule name "buffsize:<size>" tells NSPR to set the
+** The special LogModule name "bufsize:<size>" tells NSPR to set the
 ** log buffer to <size>.
 **
 ** The environment variable NSPR_LOG_FILE specifies the log file to use
@@ -232,7 +232,7 @@ NSPR_API(void) PR_LogFlush(void);
 
 #endif /* NO_NSPR_10_SUPPORT */
 
-#if defined(DEBUG)
+#if defined(DEBUG) || defined(FORCE_PR_ASSERT)
 
 NSPR_API(void) PR_Assert(const char *s, const char *file, PRIntn ln);
 #define PR_ASSERT(_expr) \
@@ -246,7 +246,7 @@ NSPR_API(void) PR_Assert(const char *s, const char *file, PRIntn ln);
 #define PR_ASSERT(expr) ((void) 0)
 #define PR_NOT_REACHED(reasonStr)
 
-#endif /* defined(DEBUG) */
+#endif /* defined(DEBUG) || defined(FORCE_PR_ASSERT) */
 
 PR_END_EXTERN_C
 

@@ -328,8 +328,10 @@ NSPR_API(PRInt32)                      _pr_intsOff;
 #define _MD_LAST_THREAD()               (_pr_lastThread)
 #define _MD_SET_LAST_THREAD(t)          (_pr_lastThread = t)
 
+#ifndef XP_MAC
 #define _MD_GET_INTSOFF()               (_pr_intsOff)
 #define _MD_SET_INTSOFF(_val)           (_pr_intsOff = _val)
+#endif
 
 
 /* The unbalanced curly braces in these two macros are intentional */
@@ -374,11 +376,19 @@ extern PRInt32                  _native_threads_only;
 
 #else
 
+#ifdef XP_MAC
+
+#define _PR_INTSOFF(_is)        _MD_INTSOFF(_is)
+
+#else /* XP_MAC */
+
 #define _PR_INTSOFF(_is) \
     PR_BEGIN_MACRO \
         (_is) = _PR_MD_GET_INTSOFF(); \
         _PR_MD_SET_INTSOFF(1); \
     PR_END_MACRO
+
+#endif /* XP_MAC */
 
 #define _PR_FAST_INTSON(_is) \
     PR_BEGIN_MACRO \
@@ -730,10 +740,6 @@ extern void _PR_ClockInterrupt(void);
 extern void _PR_Schedule(void);
 extern void _PR_SetThreadPriority(
     PRThread* thread, PRThreadPriority priority);
-NSPR_API(void) _PR_Unlock(PRLock *lock);
-
-NSPR_API(void) _PR_SuspendThread(PRThread *t);
-NSPR_API(void) _PR_ResumeThread(PRThread *t);
 
 /***********************************************************************
 ** FUNCTION:	_PR_NewSegment()
@@ -881,7 +887,8 @@ NSPR_API(void) _PR_MD_FREE_LOCK(_MDLock *md);
 NSPR_API(void) _PR_MD_LOCK(_MDLock *md);
 #define    _PR_MD_LOCK _MD_LOCK
 
-NSPR_API(PRBool) _PR_MD_TEST_AND_LOCK(_MDLock *md);
+/* Return 0 on success, a nonzero value on failure. */
+NSPR_API(PRIntn) _PR_MD_TEST_AND_LOCK(_MDLock *md);
 #define    _PR_MD_TEST_AND_LOCK _MD_TEST_AND_LOCK
 
 NSPR_API(void) _PR_MD_UNLOCK(_MDLock *md);
@@ -1410,7 +1417,8 @@ struct PRLock {
 #if defined(_PR_PTHREADS)
     pthread_mutex_t mutex;          /* the underlying lock */
     _PT_Notified notified;          /* array of conditions notified */
-    pthread_t owner;                /* current lock owner */
+    PRBool locked;                  /* whether the mutex is locked */
+    pthread_t owner;                /* if locked, current lock owner */
 #elif defined(_PR_BTHREADS)
     sem_id	semaphoreID;	    /* the underlying lock */
     int32	benaphoreCount;	    /* number of people in lock */
@@ -1447,8 +1455,8 @@ struct PRCondVar {
 struct PRMonitor {
     const char* name;           /* monitor name for debugging */
 #if defined(_PR_PTHREADS)
-    PRLock lock;                /* the lock struture structure */
-    pthread_t owner;            /* the owner of the lock or zero */
+    PRLock lock;                /* the lock structure */
+    pthread_t owner;            /* the owner of the lock or invalid */
     PRCondVar *cvar;            /* condition variable queue */
 #else  /* defined(_PR_PTHREADS) */
     PRCondVar *cvar;            /* associated lock and condition variable queue */
@@ -1733,6 +1741,16 @@ extern void _PR_InitMW(void);
 extern void _PR_InitRWLocks(void);
 extern void _PR_NotifyCondVar(PRCondVar *cvar, PRThread *me);
 extern void _PR_CleanupThread(PRThread *thread);
+extern void _PR_CleanupCallOnce(void);
+extern void _PR_CleanupMW(void);
+extern void _PR_CleanupDtoa(void);
+extern void _PR_ShutdownLinker(void);
+extern void _PR_CleanupEnv(void);
+extern void _PR_CleanupIO(void);
+extern void _PR_CleanupNet(void);
+extern void _PR_CleanupLayerCache(void);
+extern void _PR_CleanupStacks(void);
+extern void _PR_CleanupThreads(void);
 extern void _PR_CleanupTPD(void);
 extern void _PR_Cleanup(void);
 extern void _PR_LogCleanup(void);
@@ -1779,11 +1797,28 @@ extern PRFileDesc *_pr_stdin;
 extern PRFileDesc *_pr_stdout;
 extern PRFileDesc *_pr_stderr;
 
+/* Zone allocator */
+/*
+** The zone allocator code has hardcoded pthread types and
+** functions, so it can only be used in the pthreads version.
+** This can be fixed by replacing the hardcoded pthread types
+** and functions with macros that expand to the native thread
+** types and functions on each platform.
+*/
+#if defined(_PR_PTHREADS) && !defined(_PR_DCETHREADS)
+#define _PR_ZONE_ALLOCATOR
+#endif
+
+#ifdef _PR_ZONE_ALLOCATOR
+extern void _PR_InitZones(void);
+extern void _PR_DestroyZones(void);
+#endif
+
 /* Overriding malloc, free, etc. */
 #if !defined(_PR_NO_PREEMPT) && defined(XP_UNIX) \
         && !defined(_PR_PTHREADS) && !defined(_PR_GLOBAL_THREADS_ONLY) \
         && !defined(PURIFY) \
-        && !defined(RHAPSODY) \
+        && !defined(DARWIN) \
         && !defined(NEXTSTEP) \
         && !defined(QNX) \
         && !(defined (UNIXWARE) && defined (USE_SVR4_THREADS))

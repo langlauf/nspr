@@ -51,14 +51,14 @@
 
 /* BSD-derived systems use sysctl() to get the number of processors */
 #if defined(BSDI) || defined(FREEBSD) || defined(NETBSD) \
-    || defined(OPENBSD) || defined(RHAPSODY)
+    || defined(OPENBSD) || defined(DARWIN)
 #define _PR_HAVE_SYSCTL
 #include <sys/param.h>
 #include <sys/sysctl.h>
 #endif
 
 #if defined(HPUX)
-#include <sys/mp.h>
+#include <sys/mpctl.h>
 #endif
 
 #if defined(XP_UNIX)
@@ -66,7 +66,7 @@
 #include <sys/utsname.h>
 #endif
 
-PR_IMPLEMENT(char) PR_GetDirectorySeparator()
+PR_IMPLEMENT(char) PR_GetDirectorySeparator(void)
 {
     return PR_DIRECTORY_SEPARATOR;
 }  /* PR_GetDirectorySeparator */
@@ -74,7 +74,7 @@ PR_IMPLEMENT(char) PR_GetDirectorySeparator()
 /*
 ** OBSOLETE -- the function name is misspelled.
 */
-PR_IMPLEMENT(char) PR_GetDirectorySepartor()
+PR_IMPLEMENT(char) PR_GetDirectorySepartor(void)
 {
 #if defined(DEBUG)
     static PRBool warn = PR_TRUE;
@@ -150,7 +150,6 @@ PR_IMPLEMENT(PRStatus) PR_GetSystemInfo(PRSysInfo cmd, char *buf, PRUint32 bufle
 	  default:
 			PR_SetError(PR_INVALID_ARGUMENT_ERROR, 0);
 			return PR_FAILURE;
-			break;
     }
     return PR_SUCCESS;
 }

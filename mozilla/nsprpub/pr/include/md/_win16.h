@@ -377,7 +377,7 @@ extern PRStatus _PR_KillWindowsProcess(struct PRProcess *process);
 #define _MD_NEW_LOCK(l)             (PR_SUCCESS)
 #define _MD_FREE_LOCK(l)
 #define _MD_LOCK(l)
-#define _MD_TEST_AND_LOCK(l)        (PR_FAILURE)
+#define _MD_TEST_AND_LOCK(l)        (-1)
 #define _MD_UNLOCK(l)
 
 /* --- lock and cv waiting --- */
@@ -440,13 +440,6 @@ NSPR_API(void) _MD_INIT_RUNNING_CPU(struct _PRCPU *cpu );
 */
 NSPR_API(void) _PR_NativeDestroyThread(PRThread *thread);
 NSPR_API(void) _PR_UserDestroyThread(PRThread *thread);
-
-
-/*
- * _PR_ShutdownLinker unloads all dlls loaded by the application via
- * calls to PR_LoadLibrary
- */
-void _PR_ShutdownLinker(void);
 
 
 /*

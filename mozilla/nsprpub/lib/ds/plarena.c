@@ -66,7 +66,7 @@ static PRCallOnceType once;
 **
 ** InitializeArenas() is called exactly once and only once from 
 ** LockArena(). This function creates the arena protection 
-** monitor: arenaLock.
+** lock: arenaLock.
 **
 ** Note: If the arenaLock cannot be created, InitializeArenas()
 ** fails quietly, returning only PR_FAILURE. This percolates up
@@ -206,7 +206,7 @@ PR_IMPLEMENT(void *) PL_ArenaAllocate(PLArenaPool *pool, PRUint32 nb)
     /* attempt to allocate from the heap */ 
     {  
         PRUint32 sz = PR_MAX(pool->arenasize, nb);
-        sz += (PRUword)PL_ARENA_ALIGN(pool, sizeof(*a)); /* force alignment */
+        sz += sizeof *a + pool->mask;  /* header and alignment slop */
         a = (PLArena*)PR_MALLOC(sz);
         if ( NULL != a )  {
             a->limit = (PRUword)a + sz;
@@ -339,17 +339,20 @@ PR_IMPLEMENT(void) PL_CompactArenaPool(PLArenaPool *ap)
 #endif
 }
 
-PR_IMPLEMENT(void) PL_ArenaFinish()
+PR_IMPLEMENT(void) PL_ArenaFinish(void)
 {
     PLArena *a, *next;
 
-    LockArena();
     for (a = arena_freelist; a; a = next) {
         next = a->next;
         PR_DELETE(a);
     }
     arena_freelist = NULL;
-    UnlockArena();
+
+    if (arenaLock) {
+        PR_DestroyLock(arenaLock);
+        arenaLock = NULL;
+    }
 }
 
 #ifdef PL_ARENAMETER
