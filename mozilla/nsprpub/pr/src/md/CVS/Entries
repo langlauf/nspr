@@ -1,6 +1,6 @@
-/.cvsignore/1.2/Sat May 12 04:24:53 2001//TNSPR_4_2_2_RELEASE
-/Makefile.in/1.11/Sat May 12 04:27:24 2001//TNSPR_4_2_2_RELEASE
-/prosdep.c/3.10/Fri Oct 26 04:55:48 2001//TNSPR_4_2_2_RELEASE
+/.cvsignore/1.2/Sat May 12 04:24:53 2001//TNSPR_4_3_RTM
+/Makefile.in/1.11/Sat May 12 04:27:24 2001//TNSPR_4_3_RTM
+/prosdep.c/3.10/Fri Oct 26 04:55:48 2001//TNSPR_4_3_RTM
 D/beos////
 D/mac////
 D/os2////

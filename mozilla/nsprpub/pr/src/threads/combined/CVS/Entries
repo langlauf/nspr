@@ -1,9 +1,9 @@
-/.cvsignore/1.2/Sat May 12 04:56:56 2001//TNSPR_4_2_2_RELEASE
-/Makefile.in/1.11/Thu May 17 21:42:07 2001//TNSPR_4_2_2_RELEASE
-/README/3.1/Sat Mar 28 03:37:59 1998//TNSPR_4_2_2_RELEASE
-/prucpu.c/3.13/Wed Aug 28 00:04:47 2002//TNSPR_4_2_2_RELEASE
-/prucv.c/3.7/Tue Jun 20 21:37:45 2000//TNSPR_4_2_2_RELEASE
-/prulock.c/3.11/Tue Jun  5 23:55:55 2001//TNSPR_4_2_2_RELEASE
-/prustack.c/3.7/Wed Aug 29 23:13:41 2001//TNSPR_4_2_2_RELEASE
-/pruthr.c/3.33/Wed Feb 13 19:55:19 2002//TNSPR_4_2_2_RELEASE
+/.cvsignore/1.2/Sat May 12 04:56:56 2001//TNSPR_4_3_RTM
+/Makefile.in/1.11/Thu May 17 21:42:07 2001//TNSPR_4_3_RTM
+/README/3.1/Sat Mar 28 03:37:59 1998//TNSPR_4_3_RTM
+/prucpu.c/3.13/Wed Aug 28 00:04:47 2002//TNSPR_4_3_RTM
+/prucv.c/3.7/Tue Jun 20 21:37:45 2000//TNSPR_4_3_RTM
+/prulock.c/3.11/Tue Jun  5 23:55:55 2001//TNSPR_4_3_RTM
+/prustack.c/3.7/Wed Aug 29 23:13:41 2001//TNSPR_4_3_RTM
+/pruthr.c/3.33/Wed Feb 13 19:55:19 2002//TNSPR_4_3_RTM
 D
