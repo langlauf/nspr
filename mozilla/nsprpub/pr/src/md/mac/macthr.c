@@ -39,7 +39,7 @@
 #include <MacTypes.h>
 #include <Timer.h>
 #include <OSUtils.h>
-
+#include <Math64.h>
 #include <LowMem.h>
 #include <Multiprocessing.h>
 #include <Gestalt.h>
@@ -48,6 +48,8 @@
 
 TimerUPP	gTimerCallbackUPP	= NULL;
 PRThread *	gPrimaryThread		= NULL;
+
+ProcessSerialNumber		gApplicationProcess;
 
 PR_IMPLEMENT(PRThread *) PR_GetPrimaryThread()
 {
@@ -159,7 +161,21 @@ extern void _MD_ClearStack(PRThreadStack *ts)
 #pragma mark -
 #pragma mark TIME MANAGER-BASED CLOCK
 
-TMTask		gTimeManagerTaskElem;
+// On Mac OS X, it's possible for the application to spend lots of time
+// in WaitNextEvent, yielding to other applications. Since NSPR threads are
+// cooperative here, this means that NSPR threads will also get very little
+// time to run. To kick ourselves out of a WaitNextEvent call when we have
+// determined that it's time to schedule another thread, the Timer Task
+// (which fires every 8ms, even when other apps have the CPU) calls WakeUpProcess.
+// We only want to do this on Mac OS X; the gTimeManagerTaskDoesWUP variable
+// indicates when we're running on that OS.
+//
+// Note that the TimerCallback makes use of gApplicationProcess. We need to
+// have set this up before the first possible run of the timer task; we do
+// so in _MD_EarlyInit().
+static Boolean  gTimeManagerTaskDoesWUP;
+
+static TMTask   gTimeManagerTaskElem;
 
 extern void _MD_IOInterrupt(void);
 _PRInterruptTable _pr_interruptTable[] = {
@@ -167,6 +183,8 @@ _PRInterruptTable _pr_interruptTable[] = {
     { "i/o", _PR_MISSED_IO, _MD_IOInterrupt, },
     { 0 }
 };
+
+#define kMacTimerInMiliSecs 8L
 
 pascal void TimerCallback(TMTaskPtr tmTaskPtr)
 {
@@ -184,8 +202,20 @@ pascal void TimerCallback(TMTaskPtr tmTaskPtr)
     //	And tell nspr that a clock interrupt occured.
     _PR_ClockInterrupt();
 	
-    if ((_PR_RUNQREADYMASK(cpu)) >> ((_PR_MD_CURRENT_THREAD()->priority)))
+    if ((_PR_RUNQREADYMASK(cpu)) >> ((_PR_MD_CURRENT_THREAD()->priority))) {
+        if (gTimeManagerTaskDoesWUP) {
+            // We only want to call WakeUpProcess if we know that NSPR has managed to switch threads
+            // since the last call, otherwise we end up spewing out WakeUpProcess() calls while the
+            // application is blocking somewhere. This can interfere with events loops other than
+            // our own (see bug 158927).
+            if (UnsignedWideToUInt64(cpu->md.lastThreadSwitch) > UnsignedWideToUInt64(cpu->md.lastWakeUpProcess))
+            {
+                WakeUpProcess(&gApplicationProcess);
+                cpu->md.lastWakeUpProcess = UpTime();
+            }
+        }
         _PR_SET_RESCHED_FLAG();
+	}
 	
     _PR_FAST_INTSON(is);
 
@@ -197,6 +227,8 @@ pascal void TimerCallback(TMTaskPtr tmTaskPtr)
 void _MD_StartInterrupts(void)
 {
 	gPrimaryThread = _PR_MD_CURRENT_THREAD();
+
+	gTimeManagerTaskDoesWUP = RunningOnOSX();
 
 	if ( !gTimerCallbackUPP )
 		gTimerCallbackUPP = NewTimerUPP(TimerCallback);
@@ -239,6 +271,16 @@ void _MD_PauseCPU(PRIntervalTime timeout)
 
         WaitOnIdleSemaphore(timeout);
         (void) _MD_IOInterrupt();
+    }
+}
+
+void _MD_InitRunningCPU(_PRCPU* cpu)
+{
+    cpu->md.trackScheduling = RunningOnOSX();
+    if (cpu->md.trackScheduling) {
+        AbsoluteTime    zeroTime = {0, 0};
+        cpu->md.lastThreadSwitch = UpTime();
+        cpu->md.lastWakeUpProcess = zeroTime;
     }
 }
 
@@ -607,7 +649,6 @@ void LeaveCritialRegion()
 PRBool					gUseIdleSemaphore = PR_FALSE;
 MPSemaphoreID			gIdleSemaphore = NULL;
 #endif
-ProcessSerialNumber		gApplicationProcess;
 
 void InitIdleSemaphore()
 {
@@ -619,11 +660,7 @@ void InitIdleSemaphore()
 		OSStatus  err = MPCreateSemaphore(1 /* max value */, 0 /* initial value */, &gIdleSemaphore);
 		PR_ASSERT(err == noErr);
 	}
-	else
 #endif
-	{
-		GetCurrentProcess(&gApplicationProcess);
-	}
 }
 
 void TermIdleSemaphore()

@@ -179,14 +179,11 @@ static ssize_t (*pt_aix_sendfile_fptr)() = NULL;
 
 #include "primpl.h"
 
-/* On Alpha Linux, these are already defined in sys/socket.h */
-#if !(defined(LINUX) && defined(__alpha))
 #include <netinet/tcp.h>  /* TCP_NODELAY, TCP_MAXSEG */
 #ifdef LINUX
 /* TCP_CORK is not defined in <netinet/tcp.h> on Red Hat Linux 6.0 */
 #ifndef TCP_CORK
 #define TCP_CORK 3
-#endif
 #endif
 #endif
 
@@ -291,11 +288,9 @@ static PRBool IsValidNetAddrLen(const PRNetAddr *addr, PRInt32 addr_len)
  * most current systems.
  */
 #if defined(HAVE_SOCKLEN_T) \
-    || (defined(LINUX) && defined(__GLIBC__) && __GLIBC__ >= 2 \
-    && !defined(__alpha))
+    || (defined(LINUX) && defined(__GLIBC__) && __GLIBC__ >= 2)
 typedef socklen_t pt_SockLen;
 #elif (defined(AIX) && !defined(AIX4_1)) \
-    || (defined(LINUX) && defined(__alpha)) \
     || defined(VMS)
 typedef PRSize pt_SockLen;
 #else
@@ -1060,9 +1055,8 @@ static PRBool pt_solaris_sendfile_cont(pt_Continuation *op, PRInt16 revents)
     ssize_t count;
 
     count = SOLARIS_SENDFILEV(op->arg1.osfd, vec, op->arg3.amount, &xferred);
-    PR_ASSERT((count == -1) || (count == xferred));
-    PR_ASSERT(xferred <= op->nbytes_to_send);
     op->syserrno = errno;
+    PR_ASSERT((count == -1) || (count == xferred));
 
     if (count == -1) {
         if (op->syserrno != EWOULDBLOCK && op->syserrno != EAGAIN
@@ -1072,6 +1066,7 @@ static PRBool pt_solaris_sendfile_cont(pt_Continuation *op, PRInt16 revents)
         }
         count = xferred;
     }
+    PR_ASSERT(count <= op->nbytes_to_send);
     
     op->result.code += count;
     if (count < op->nbytes_to_send) {
@@ -1632,6 +1627,18 @@ static PRFileDesc* pt_Accept(
     pt_SockLen addr_len = sizeof(PRNetAddr);
 
     if (pt_TestAbort()) return newfd;
+
+#ifdef _PR_STRICT_ADDR_LEN
+    if (addr)
+    {
+        /*
+         * Set addr->raw.family just so that we can use the
+         * PR_NETADDR_SIZE macro.
+         */
+        addr->raw.family = fd->secret->af;
+        addr_len = PR_NETADDR_SIZE(addr);
+    }
+#endif
 
     osfd = accept(fd->secret->md.osfd, (struct sockaddr*)addr, &addr_len);
     syserrno = errno;
@@ -3422,6 +3429,9 @@ PR_IMPLEMENT(PRFileDesc*) PR_Socket(PRInt32 domain, PRInt32 type, PRInt32 proto)
         fd = pt_SetMethods(osfd, ftype, PR_FALSE, PR_FALSE);
         if (fd == NULL) close(osfd);
     }
+#ifdef _PR_STRICT_ADDR_LEN
+    if (fd != NULL) fd->secret->af = domain;
+#endif
 #if defined(_PR_INET6_PROBE) || !defined(_PR_INET6)
 	if (fd != NULL) {
 		/*
@@ -4374,6 +4384,9 @@ PR_IMPLEMENT(PRFileDesc*) PR_ImportTCPSocket(PRInt32 osfd)
     if (!_pr_initialized) _PR_ImplicitInitialization();
     fd = pt_SetMethods(osfd, PR_DESC_SOCKET_TCP, PR_FALSE, PR_TRUE);
     if (NULL == fd) close(osfd);
+#ifdef _PR_STRICT_ADDR_LEN
+    if (NULL != fd) fd->secret->af = PF_INET;
+#endif
     return fd;
 }  /* PR_ImportTCPSocket */
 
