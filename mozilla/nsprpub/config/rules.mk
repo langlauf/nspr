@@ -311,8 +311,9 @@ endif
 	$(RANLIB) $@
 
 ifeq ($(OS_TARGET), OS2)
-$(IMPORT_LIBRARY): $(SHARED_LIBRARY)
-	$(IMPLIB) $@ $(SHARED_LIBRARY).def
+$(IMPORT_LIBRARY): $(MAPFILE)
+	rm -f $@
+	$(IMPLIB) $@ $(MAPFILE)
 endif
 
 $(SHARED_LIBRARY): $(OBJS) $(MAPFILE)
@@ -330,16 +331,9 @@ else	# AIX 4.1
 ifeq ($(NS_USE_GCC)_$(OS_ARCH),_WINNT)
 	$(LINK_DLL) -MAP $(DLLBASE) $(DLL_LIBS) $(EXTRA_LIBS) $(OBJS)
 else
-ifeq ($(OS_ARCH),OS2)
-# append ( >> ) doesn't seem to be working under OS/2 gmake. Run through OS/2 shell instead.	
-	@cmd /C "echo LIBRARY $(notdir $(basename $(SHARED_LIBRARY))) INITINSTANCE TERMINSTANCE >$@.def"
-	@cmd /C "echo PROTMODE >>$@.def"
-	@cmd /C "echo CODE    LOADONCALL MOVEABLE DISCARDABLE >>$@.def"
-	@cmd /C "echo DATA    PRELOAD MOVEABLE MULTIPLE NONSHARED >>$@.def"	
-	@cmd /C "echo EXPORTS >>$@.def"
-	@cmd /C "$(FILTER) $(LIBRARY) | grep -v _DLL_InitTerm >>$@.def"
-	$(LINK_DLL) $(DLLBASE) $(OBJS) $(OS_LIBS) $(EXTRA_LIBS) $@.def
-else	# OS2
+ifeq ($(MOZ_OS2_TOOLS),VACPP)
+	$(LINK_DLL) $(DLLBASE) $(OBJS) $(OS_LIBS) $(EXTRA_LIBS) $(MAPFILE)
+else	# !os2 vacpp
 ifeq ($(OS_TARGET), OpenVMS)
 	@if test ! -f $(VMS_SYMVEC_FILE); then \
 	  if test -f $(VMS_SYMVEC_FILE_MODULE); then \
@@ -349,7 +343,7 @@ ifeq ($(OS_TARGET), OpenVMS)
 	fi
 endif	# OpenVMS
 	$(MKSHLIB) $(OBJS) $(EXTRA_LIBS)
-endif   # OS2
+endif   # OS2 vacpp
 endif	# WINNT
 endif	# AIX 4.1
 ifdef ENABLE_STRIP
@@ -378,16 +372,47 @@ ifeq ($(OS_ARCH),SunOS)
 	grep -v ';-' $< | \
 	sed -e 's,;+,,' -e 's; DATA ;;' -e 's,;;,,' -e 's,;.*,;,' > $@
 endif
+ifeq ($(OS_ARCH),OS2)
+	echo LIBRARY $(LIBRARY_NAME)$(LIBRARY_VERSION) INITINSTANCE TERMINSTANCE > $@
+	echo PROTMODE >> $@
+	echo CODE    LOADONCALL MOVEABLE DISCARDABLE >> $@
+	echo DATA    PRELOAD MOVEABLE MULTIPLE NONSHARED >> $@
+	echo EXPORTS >> $@
+	grep -v ';+' $< | grep -v ';-' | \
+	sed -e 's; DATA ;;' -e 's,;;,,' -e 's,;.*,,' >> $@
+endif
+
+#
+# Translate source filenames to absolute paths. This is required for
+# debuggers under Windows and OS/2 to find source files automatically.
+#
+
+ifeq ($(OS_ARCH),OS2)
+NEED_ABSOLUTE_PATH = 1
+endif
+
+ifeq ($(NS_USE_GCC)_$(OS_ARCH),_WINNT)
+NEED_ABSOLUTE_PATH = 1
+endif
+
+ifdef NEED_ABSOLUTE_PATH
+PWD := $(shell pwd)
+abspath = $(if $(findstring :,$(1)),$(1),$(if $(filter /%,$(1)),$(1),$(PWD)/$(1)))
+endif
 
 $(OBJDIR)/%.$(OBJ_SUFFIX): %.cpp
 	@$(MAKE_OBJDIR)
 ifeq ($(NS_USE_GCC)_$(OS_ARCH),_WINNT)
-	$(CCC) -Fo$@ -c $(CCCFLAGS) $<
+	$(CCC) -Fo$@ -c $(CCCFLAGS) $(call abspath,$<)
 else
 ifeq ($(MOZ_OS2_TOOLS),VACPP)
-	$(CCC) -Fo$@ -c $(CCCFLAGS) $<
+	$(CCC) -Fo$@ -c $(CCCFLAGS) $(call abspath,$<)
+else
+ifdef NEED_ABSOLUTE_PATH
+	$(CCC) -o $@ -c $(CCCFLAGS) $(call abspath,$<)
 else
 	$(CCC) -o $@ -c $(CCCFLAGS) $<
+endif
 endif
 endif
 
@@ -397,12 +422,16 @@ WCCFLAGS3 = $(subst -D,-d,$(WCCFLAGS2))
 $(OBJDIR)/%.$(OBJ_SUFFIX): %.c
 	@$(MAKE_OBJDIR)
 ifeq ($(NS_USE_GCC)_$(OS_ARCH),_WINNT)
-	$(CC) -Fo$@ -c $(CFLAGS) $<
+	$(CC) -Fo$@ -c $(CFLAGS) $(call abspath,$<)
 else
 ifeq ($(MOZ_OS2_TOOLS),VACPP)
-	$(CC) -Fo$@ -c $(CFLAGS) $<
+	$(CC) -Fo$@ -c $(CFLAGS) $(call abspath,$<)
+else
+ifdef NEED_ABSOLUTE_PATH
+	$(CC) -o $@ -c $(CFLAGS) $(call abspath,$<)
 else
 	$(CC) -o $@ -c $(CFLAGS) $<
+endif
 endif
 endif
 
