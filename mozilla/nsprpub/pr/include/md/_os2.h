@@ -1,40 +1,46 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* 
- * The contents of this file are subject to the Mozilla Public
- * License Version 1.1 (the "License"); you may not use this file
- * except in compliance with the License. You may obtain a copy of
- * the License at http://www.mozilla.org/MPL/
- * 
- * Software distributed under the License is distributed on an "AS
- * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
- * implied. See the License for the specific language governing
- * rights and limitations under the License.
- * 
+/* ***** BEGIN LICENSE BLOCK *****
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
+ *
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
  * The Original Code is the Netscape Portable Runtime (NSPR).
- * 
- * The Initial Developer of the Original Code is Netscape
- * Communications Corporation.  Portions created by Netscape are 
- * Copyright (C) 1998-2000 Netscape Communications Corporation.  All
- * Rights Reserved.
- * 
+ *
+ * The Initial Developer of the Original Code is
+ * Netscape Communications Corporation.
+ * Portions created by the Initial Developer are Copyright (C) 1998-2000
+ * the Initial Developer. All Rights Reserved.
+ *
  * Contributor(s):
- * 
- * Alternatively, the contents of this file may be used under the
- * terms of the GNU General Public License Version 2 or later (the
- * "GPL"), in which case the provisions of the GPL are applicable 
- * instead of those above.  If you wish to allow use of your 
- * version of this file only under the terms of the GPL and not to
- * allow others to use your version of this file under the MPL,
- * indicate your decision by deleting the provisions above and
- * replace them with the notice and other provisions required by
- * the GPL.  If you do not delete the provisions above, a recipient
- * may use your version of this file under either the MPL or the
- * GPL.
- */
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
+ *
+ * ***** END LICENSE BLOCK ***** */
 
 #ifndef nspr_os2_defs_h___
 #define nspr_os2_defs_h___
 
+#ifndef NO_LONG_LONG
+#define INCL_LONGLONG
+#endif
 #define INCL_DOS
 #define INCL_DOSPROCESS
 #define INCL_DOSERRORS
@@ -75,19 +81,6 @@ APIRET _Optlink SemRequest486(PRAMSEM, ULONG);
 APIRET _Optlink SemReleasex86(PRAMSEM, ULONG);
 #endif
 
-#ifdef XP_OS2_EMX
-/*
- * EMX-specific tweaks:
- *    o Use errno rather than sock_errno()
- *    o Use close rather than soclose
- *    o Ignore sock_init calls.
- */
-#define sock_errno() errno
-#define soclose close
-#define sock_init()
-#include <string.h>
-#endif
-
 /*
  * Internal configuration macros
  */
@@ -97,7 +90,9 @@ APIRET _Optlink SemReleasex86(PRAMSEM, ULONG);
 #define _PR_SI_ARCHITECTURE   "x86"    /* XXXMB hardcode for now */
 
 #define HAVE_DLL
+#define _PR_GLOBAL_THREADS_ONLY
 #undef  HAVE_THREAD_AFFINITY
+#define _PR_HAVE_THREADSAFE_GETHOST
 #define _PR_HAVE_ATOMIC_OPS
 
 #define HANDLE unsigned long
@@ -159,7 +154,10 @@ struct _MDSegment {
 
 struct _MDDir {
     HDIR           d_hdl;
-    FILEFINDBUF3  d_entry;
+    union {
+        FILEFINDBUF3  small;
+        FILEFINDBUF3L large;
+    } d_entry;
     PRBool           firstEntry;     /* Is this the entry returned
                                       * by FindFirstFile()? */
     PRUint32         magic;          /* for debugging */
@@ -294,18 +292,15 @@ extern PRInt32 _MD_CloseSocket(PRInt32 osfd);
 #define _MD_CLOSE_SOCKET              _MD_CloseSocket
 #define _MD_SENDTO                    (_PR_MD_SENDTO)
 #define _MD_RECVFROM                  (_PR_MD_RECVFROM)
+#ifdef XP_OS2_VACPP
 #define _MD_SOCKETPAIR(s, type, proto, sv) -1
+#else
+#define _MD_SOCKETPAIR                (_PR_MD_SOCKETPAIR)
+#endif
 #define _MD_GETSOCKNAME               (_PR_MD_GETSOCKNAME)
 #define _MD_GETPEERNAME               (_PR_MD_GETPEERNAME)
 #define _MD_GETSOCKOPT                (_PR_MD_GETSOCKOPT)
 #define _MD_SETSOCKOPT                (_PR_MD_SETSOCKOPT)
-
-#ifdef XP_OS2_EMX
-extern PRInt32 _MD_SELECT(int nfds, fd_set *readfds, fd_set *writefds,
-                                    fd_set *exceptfds, struct timeval *timeout);
-#else
-#define _MD_SELECT                    select
-#endif
 
 #define _MD_FSYNC                     _PR_MD_FSYNC
 #define _MD_SET_FD_INHERITABLE        (_PR_MD_SET_FD_INHERITABLE)
@@ -321,7 +316,6 @@ extern PRInt32 _MD_SELECT(int nfds, fd_set *readfds, fd_set *writefds,
 #define _MD_INIT_IO                   (_PR_MD_INIT_IO)
 #define _MD_PR_POLL                   (_PR_MD_PR_POLL)
 
-/* win95 doesn't have async IO */
 #define _MD_SOCKET                    (_PR_MD_SOCKET)
 extern PRInt32 _MD_SocketAvailable(PRFileDesc *fd);
 #define _MD_SOCKETAVAILABLE           _MD_SocketAvailable
@@ -463,7 +457,10 @@ extern PRStatus _PR_KillOS2Process(struct PRProcess *process);
 
 #define _MD_CLEANUP_BEFORE_EXIT()
 #define _MD_EXIT                          (_PR_MD_EXIT)
-#define _MD_INIT_CONTEXT
+#define _MD_INIT_CONTEXT(_thread, _sp, _main, status) \
+    PR_BEGIN_MACRO \
+    *status = PR_TRUE; \
+    PR_END_MACRO
 #define _MD_SWITCH_CONTEXT
 #define _MD_RESTORE_CONTEXT
 
@@ -579,7 +576,6 @@ typedef struct _CONTEXTRECORD {
 #endif
 
 extern APIRET (* APIENTRY QueryThreadContext)(TID, ULONG, PCONTEXTRECORD);
-unsigned long _System _DLL_InitTerm( unsigned long mod_handle, unsigned long flag);
 
 /*
 #define _pr_tid            (((PTIB2)_getTIBvalue(offsetof(TIB, tib_ptib2)))->tib2_ultid)

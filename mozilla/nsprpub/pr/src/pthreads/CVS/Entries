@@ -1,7 +1,7 @@
-/.cvsignore/1.2/Sat May 12 04:53:48 2001//TNSPR_4_4_1_RTM
-/Makefile.in/1.12/Wed Mar 20 21:06:10 2002//TNSPR_4_4_1_RTM
-/ptio.c/3.92/Mon Jul 14 22:12:19 2003//TNSPR_4_4_1_RTM
-/ptmisc.c/3.7/Tue Jun 20 21:37:02 2000//TNSPR_4_4_1_RTM
-/ptsynch.c/3.23/Wed Mar 20 21:06:10 2002//TNSPR_4_4_1_RTM
-/ptthread.c/3.59/Fri Aug 23 00:04:19 2002//TNSPR_4_4_1_RTM
+/.cvsignore/1.2/Sat May 12 04:53:48 2001//TNSPR_4_6_RTM
+/Makefile.in/1.13/Sun Apr 25 15:01:01 2004//TNSPR_4_6_RTM
+/ptio.c/3.99/Wed Mar  9 22:57:06 2005//TNSPR_4_6_RTM
+/ptmisc.c/3.8/Sun Apr 25 15:01:01 2004//TNSPR_4_6_RTM
+/ptsynch.c/3.28/Mon Nov 22 21:24:53 2004//TNSPR_4_6_RTM
+/ptthread.c/3.64/Thu May 26 02:27:51 2005//TNSPR_4_6_RTM
 D

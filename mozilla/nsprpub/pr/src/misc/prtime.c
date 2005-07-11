@@ -1,36 +1,39 @@
 /* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* 
- * The contents of this file are subject to the Mozilla Public
- * License Version 1.1 (the "License"); you may not use this file
- * except in compliance with the License. You may obtain a copy of
- * the License at http://www.mozilla.org/MPL/
- * 
- * Software distributed under the License is distributed on an "AS
- * IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
- * implied. See the License for the specific language governing
- * rights and limitations under the License.
- * 
+/* ***** BEGIN LICENSE BLOCK *****
+ * Version: MPL 1.1/GPL 2.0/LGPL 2.1
+ *
+ * The contents of this file are subject to the Mozilla Public License Version
+ * 1.1 (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ *
+ * Software distributed under the License is distributed on an "AS IS" basis,
+ * WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License
+ * for the specific language governing rights and limitations under the
+ * License.
+ *
  * The Original Code is the Netscape Portable Runtime (NSPR).
- * 
- * The Initial Developer of the Original Code is Netscape
- * Communications Corporation.  Portions created by Netscape are 
- * Copyright (C) 1998-2000 Netscape Communications Corporation.  All
- * Rights Reserved.
- * 
+ *
+ * The Initial Developer of the Original Code is
+ * Netscape Communications Corporation.
+ * Portions created by the Initial Developer are Copyright (C) 1998-2000
+ * the Initial Developer. All Rights Reserved.
+ *
  * Contributor(s):
- * 
- * Alternatively, the contents of this file may be used under the
- * terms of the GNU General Public License Version 2 or later (the
- * "GPL"), in which case the provisions of the GPL are applicable 
- * instead of those above.  If you wish to allow use of your 
- * version of this file only under the terms of the GPL and not to
- * allow others to use your version of this file under the MPL,
- * indicate your decision by deleting the provisions above and
- * replace them with the notice and other provisions required by
- * the GPL.  If you do not delete the provisions above, a recipient
- * may use your version of this file under either the MPL or the
- * GPL.
- */
+ *
+ * Alternatively, the contents of this file may be used under the terms of
+ * either the GNU General Public License Version 2 or later (the "GPL"), or
+ * the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
+ * in which case the provisions of the GPL or the LGPL are applicable instead
+ * of those above. If you wish to allow use of your version of this file only
+ * under the terms of either the GPL or the LGPL, and not to allow others to
+ * use your version of this file under the terms of the MPL, indicate your
+ * decision by deleting the provisions above and replace them with the notice
+ * and other provisions required by the GPL or the LGPL. If you do not delete
+ * the provisions above, a recipient may use your version of this file under
+ * the terms of any one of the MPL, the GPL or the LGPL.
+ *
+ * ***** END LICENSE BLOCK ***** */
 
 /*
  * prtime.c --
@@ -637,6 +640,7 @@ PR_LocalTimeParameters(const PRExplodedTime *gmt)
     PRTime secs64;
     PRInt64 usecPerSec;
     PRInt64 maxInt32;
+    PRInt64 minInt32;
     PRInt32 dayOffset;
     PRInt32 offset2Jan1970;
     PRInt32 offsetNew;
@@ -682,9 +686,10 @@ PR_LocalTimeParameters(const PRExplodedTime *gmt)
     secs64 = PR_ImplodeTime(gmt);    /* This is still in microseconds */
     LL_I2L(usecPerSec, PR_USEC_PER_SEC);
     LL_DIV(secs64, secs64, usecPerSec);   /* Convert to seconds */
-    LL_I2L(maxInt32, 0x7fffffff);
-    if (LL_CMP(secs64, >, maxInt32)) {
-        /* secs64 is too large for time_t (32-bit integer) */
+    LL_I2L(maxInt32, PR_INT32_MAX);
+    LL_I2L(minInt32, PR_INT32_MIN);
+    if (LL_CMP(secs64, >, maxInt32) || LL_CMP(secs64, <, minInt32)) {
+        /* secs64 is too large or too small for time_t (32-bit integer) */
         retVal.tp_gmt_offset = offset2Jan1970;
         retVal.tp_dst_offset = 0;
         return retVal;

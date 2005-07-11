@@ -162,13 +162,9 @@ struct _imcb *IAC$GL_IMAGE_LIST = NULL;
  * On these platforms, symbols have a leading '_'.
  */
 #if defined(SUNOS4) || defined(DARWIN) || defined(NEXTSTEP) \
-    || defined(OPENBSD) || defined(WIN16) \
-    || (defined(NETBSD) && !defined(__ELF__))
+    || defined(WIN16) || defined(XP_OS2) \
+    || ((defined(OPENBSD) || defined(NETBSD)) && !defined(__ELF__))
 #define NEED_LEADING_UNDERSCORE
-#endif
-
-#ifdef XP_PC
-typedef PRStaticLinkTable *NODL_PROC(void);
 #endif
 
 /************************************************************************/
@@ -266,7 +262,7 @@ static void DLLErrorInternal(PRIntn oserr)
 
 void _PR_InitLinker(void)
 {
-#ifndef XP_MAC
+#if !defined(XP_MAC) && !defined(XP_BEOS)
     PRLibrary *lm;
 #endif
 #if defined(XP_UNIX)
@@ -335,7 +331,7 @@ void _PR_InitLinker(void)
 #endif /* HAVE_DLL */
 #endif /* XP_UNIX */
 
-#ifndef XP_MAC
+#if !defined(XP_MAC) && !defined(XP_BEOS)
     PR_LOG(_pr_linker_lm, PR_LOG_MIN, ("Loaded library %s (init)", lm?lm->name:"NULL"));
 #endif
 
@@ -939,8 +935,7 @@ pr_LoadLibraryByPathname(const char *name, PRIntn flags)
         UCHAR pszError[_MAX_PATH];
         ULONG ulRc = NO_ERROR;
 
-        retry:
-              ulRc = DosLoadModule(pszError, _MAX_PATH, (PSZ) name, &h);
+          ulRc = DosLoadModule(pszError, _MAX_PATH, (PSZ) name, &h);
           if (ulRc != NO_ERROR) {
               oserr = ulRc;
               PR_DELETE(lm);
@@ -956,7 +951,6 @@ pr_LoadLibraryByPathname(const char *name, PRIntn flags)
 #if defined(WIN32) || defined(WIN16)
     {
     HINSTANCE h;
-    NODL_PROC *pfn;
 
     h = LoadLibrary(name);
     if (h < (HINSTANCE)HINSTANCE_ERROR) {
@@ -968,15 +962,6 @@ pr_LoadLibraryByPathname(const char *name, PRIntn flags)
     lm->dlh = h;
     lm->next = pr_loadmap;
     pr_loadmap = lm;
-
-    /*
-    ** Try to load a table of "static functions" provided by the DLL
-    */
-
-    pfn = (NODL_PROC *)GetProcAddress(h, "NODL_TABLE");
-    if (pfn != NULL) {
-        lm->staticTable = (*pfn)();
-    }
     }
 #endif /* WIN32 || WIN16 */
 
@@ -1017,6 +1002,9 @@ pr_LoadLibraryByPathname(const char *name, PRIntn flags)
 #ifdef NTO
     /* Neutrino needs RTLD_GROUP to load Netscape plugins. (bug 71179) */
     int dl_flags = RTLD_GROUP;
+#elif defined(AIX)
+    /* AIX needs RTLD_MEMBER to load an archive member.  (bug 228899) */
+    int dl_flags = RTLD_MEMBER;
 #else
     int dl_flags = 0;
 #endif
@@ -1127,14 +1115,14 @@ pr_LoadLibraryByPathname(const char *name, PRIntn flags)
 
                 cookie = 0;
                 while (get_next_image_info(0, &cookie, &info) == B_OK) {
-                    char *endOfSystemName = strrchr(info.name, '/');
-                    char *endOfPassedName = strrchr(name, '/');
+                    const char *endOfSystemName = strrchr(info.name, '/');
+                    const char *endOfPassedName = strrchr(name, '/');
                     if( 0 == endOfSystemName ) 
-                        endOfSystemName=info.name;
+                        endOfSystemName = info.name;
                     else
                         endOfSystemName++;
                     if( 0 == endOfPassedName )
-                        endOfPassedName=name;
+                        endOfPassedName = name;
                     else
                         endOfPassedName++;
                     if (strcmp(endOfSystemName, endOfPassedName) == 0) {
@@ -1173,18 +1161,6 @@ pr_LoadLibraryByPathname(const char *name, PRIntn flags)
         PR_SetError(PR_LOAD_LIBRARY_ERROR, oserr);
         DLLErrorInternal(oserr);  /* sets error text */
     }
-    PR_ExitMonitor(pr_linker_lock);
-    return result;
-}
-
-PR_IMPLEMENT(PRLibrary*) 
-PR_FindLibrary(const char *name)
-{
-    PRLibrary* result;
-
-    if (!_pr_initialized) _PR_ImplicitInitialization();
-    PR_EnterMonitor(pr_linker_lock);
-    result = pr_UnlockedFindLibrary(name);
     PR_ExitMonitor(pr_linker_lock);
     return result;
 }
@@ -1432,6 +1408,9 @@ static void*
 pr_FindSymbolInLib(PRLibrary *lm, const char *name)
 {
     void *f = NULL;
+#ifdef XP_OS2
+    int rc;
+#endif
 
     if (lm->staticTable != NULL) {
         const PRStaticLinkTable* tp;
@@ -1451,7 +1430,17 @@ pr_FindSymbolInLib(PRLibrary *lm, const char *name)
     }
     
 #ifdef XP_OS2
-    DosQueryProcAddr(lm->dlh, 0, (PSZ) name, (PFN *) &f);
+    rc = DosQueryProcAddr(lm->dlh, 0, (PSZ) name, (PFN *) &f);
+#if defined(NEED_LEADING_UNDERSCORE)
+    /*
+     * Older plugins (not built using GCC) will have symbols that are not
+     * underscore prefixed.  We check for that here.
+     */
+    if (rc != NO_ERROR) {
+        name++;
+        DosQueryProcAddr(lm->dlh, 0, (PSZ) name, (PFN *) &f);
+    }
+#endif
 #endif  /* XP_OS2 */
 
 #if defined(WIN32) || defined(WIN16)
@@ -1701,7 +1690,7 @@ PR_LoadStaticLibrary(const char *name, const PRStaticLinkTable *slt)
 PR_IMPLEMENT(char *)
 PR_GetLibraryFilePathname(const char *name, PRFuncPtr addr)
 {
-#if defined(SOLARIS) || defined(LINUX)
+#if defined(SOLARIS) || defined(LINUX) || defined(FREEBSD)
     Dl_info dli;
     char *result;
 
@@ -1738,6 +1727,7 @@ PR_GetLibraryFilePathname(const char *name, PRFuncPtr addr)
     struct ld_info *info;
     unsigned int info_length = LD_INFO_INCREMENT * sizeof(struct ld_info);
     struct ld_info *infop;
+    int loadflags = L_GETINFO | L_IGNOREUNLOAD;
 
     for (;;) {
         info = PR_Malloc(info_length);
@@ -1745,8 +1735,21 @@ PR_GetLibraryFilePathname(const char *name, PRFuncPtr addr)
             return NULL;
         }
         /* If buffer is too small, loadquery fails with ENOMEM. */
-        if (loadquery(L_GETINFO, info, info_length) != -1) {
+        if (loadquery(loadflags, info, info_length) != -1) {
             break;
+        }
+        /*
+         * Calling loadquery when compiled for 64-bit with the
+         * L_IGNOREUNLOAD flag can cause an invalid argument error
+         * on AIX 5.1. Detect this error the first time that
+         * loadquery is called, and try calling it again without
+         * this flag set.
+         */
+        if (errno == EINVAL && (loadflags & L_IGNOREUNLOAD)) {
+            loadflags &= ~L_IGNOREUNLOAD;
+            if (loadquery(loadflags, info, info_length) != -1) {
+                break;
+            }
         }
         PR_Free(info);
         if (errno != ENOMEM) {
@@ -1761,7 +1764,9 @@ PR_GetLibraryFilePathname(const char *name, PRFuncPtr addr)
     for (infop = info;
          ;
          infop = (struct ld_info *)((char *)infop + infop->ldinfo_next)) {
-        if (strstr(infop->ldinfo_filename, name) != NULL) {
+        unsigned long start = (unsigned long)infop->ldinfo_dataorg;
+        unsigned long end = start + infop->ldinfo_datasize;
+        if (start <= (unsigned long)addr && end > (unsigned long)addr) {
             result = PR_Malloc(strlen(infop->ldinfo_filename)+1);
             if (result != NULL) {
                 strcpy(result, infop->ldinfo_filename);
