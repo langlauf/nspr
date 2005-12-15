@@ -1,11 +1,5 @@
-/.cvsignore/1.2/Sat May 12 00:53:26 2001//TNSPR_4_6_RTM
-/Makefile.in/1.22/Sun Apr 25 15:00:32 2004//TNSPR_4_6_RTM
-/configure/1.183/Thu May 19 17:37:23 2005//TNSPR_4_6_RTM
-/configure.in/1.185/Thu May 19 17:37:23 2005//TNSPR_4_6_RTM
-D/admin////
-D/build////
-D/config////
-D/lib////
-D/pkg////
-D/pr////
-D/tools////
+/.cvsignore/1.2/Sat May 12 00:53:26 2001//TNSPR_4_6_1_RTM
+/Makefile.in/1.22/Sun Apr 25 15:00:32 2004//TNSPR_4_6_1_RTM
+/configure/1.197/Fri Sep  2 02:44:37 2005//TNSPR_4_6_1_RTM
+/configure.in/1.199/Fri Sep  2 02:44:37 2005//TNSPR_4_6_1_RTM
+D
