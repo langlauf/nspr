@@ -687,7 +687,7 @@ test "$host_alias" != "$target_alias" &&
 
 MOD_MAJOR_VERSION=4
 MOD_MINOR_VERSION=6
-MOD_PATCH_VERSION=2
+MOD_PATCH_VERSION=3
 NSPR_MODNAME=nspr20
 _HAVE_PTHREADS=
 USE_PTHREADS=
@@ -5905,6 +5905,8 @@ fi
 if test -n "$USE_CPLUS"; then
     MAKEFILES="$MAKEFILES pr/src/cplus/Makefile pr/src/cplus/tests/Makefile"
 fi
+
+echo $MAKEFILES > unallmakefiles
 
 trap '' 1 2 15
 cat > confcache <<\EOF
