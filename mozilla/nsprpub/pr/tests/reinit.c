@@ -1,5 +1,4 @@
-/* -*- Mode: C++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-
+/* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
@@ -21,6 +20,7 @@
  * the Initial Developer. All Rights Reserved.
  *
  * Contributor(s):
+ *   Ludovico Cavedon <ludovico.cavedon@gmail.com>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -35,43 +35,34 @@
  * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
-#if defined(WIN16)
-#include <windows.h>
-#endif
-#include "prtypes.h"
-#include <stdlib.h>
 
-#define MAX_SEGMENT_SIZE (65536l - 4096l)
+/* This test verifies that NSPR can be cleaned up and reinitialized. */
 
-/************************************************************************/
-/*
-** Machine dependent GC Heap management routines:
-**    _MD_GrowGCHeap
-*/
-/************************************************************************/
+#include "nspr.h"
+#include <stdio.h>
 
-void _MD_InitGC(void) {}
-
-extern void *
-_MD_GrowGCHeap(PRUint32 *sizep)
+int main()
 {
-    void *addr;
+    PRStatus rv;
 
-    if( *sizep > MAX_SEGMENT_SIZE ) {
-        *sizep = MAX_SEGMENT_SIZE;
+    fprintf(stderr, "Init 1\n");
+    PR_Init(PR_USER_THREAD, PR_PRIORITY_NORMAL, 0);
+    fprintf(stderr, "Cleanup 1\n");
+    rv = PR_Cleanup();
+    if (rv != PR_SUCCESS) {
+        fprintf(stderr, "FAIL\n");
+        return 1;
     }
 
-    addr = malloc((size_t)*sizep);
-    return addr;
+    fprintf(stderr, "Init 2\n");
+    PR_Init(PR_USER_THREAD, PR_PRIORITY_NORMAL, 0);
+    fprintf(stderr, "Cleanup 2\n");
+    rv = PR_Cleanup();
+    if (rv != PR_SUCCESS) {
+        fprintf(stderr, "FAIL\n");
+        return 1;
+    }
+
+    fprintf(stderr, "PASS\n");
+    return 0;
 }
-
-HINSTANCE _pr_hInstance;
-
-int CALLBACK LibMain( HINSTANCE hInst, WORD wDataSeg, 
-                      WORD cbHeapSize, LPSTR lpszCmdLine )
-{
-    _pr_hInstance = hInst;
-    return TRUE;
-}
-
-
