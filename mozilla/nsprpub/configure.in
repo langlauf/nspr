@@ -50,7 +50,7 @@ dnl = Defaults
 dnl ========================================================
 MOD_MAJOR_VERSION=4
 MOD_MINOR_VERSION=8
-MOD_PATCH_VERSION=3
+MOD_PATCH_VERSION=4
 NSPR_MODNAME=nspr20
 _HAVE_PTHREADS=
 USE_PTHREADS=
@@ -380,7 +380,7 @@ if test -n "$MOZ_DEBUG"; then
     beos*)
         DEFINES="$DEFINES -DDEBUG_${USER}"
         ;;
-    msvc*|mks*|cygwin*|mingw*|wince*|os2*)
+    msvc*|mks*|cygwin*|mingw*|wince*|winmo*|os2*)
         DEFINES="$DEFINES -DDEBUG_`echo ${USERNAME} | sed -e 's| |_|g'`"
         ;;
     *) 
@@ -648,6 +648,7 @@ if test -n "$CROSS_COMPILE"; then
         solaris*)     OS_ARCH=SunOS OS_RELEASE=5 ;;
         mingw*)       OS_ARCH=WINNT ;;
         wince*)       OS_ARCH=WINCE ;;
+        winmo*)       OS_ARCH=WINCE ;;
         darwin*)      OS_ARCH=Darwin ;;
         riscos*)      OS_ARCH=RISCOS ;;
     esac
@@ -805,7 +806,7 @@ case "$host" in
 *-mingw*)
     NSINSTALL=nsinstall
     ;;
-*-cygwin*|*-msvc*|*-mks*|*-wince*)
+*-cygwin*|*-msvc*|*-mks*|*-wince*|*-winmo*)
     NSINSTALL='$(CYGWIN_WRAPPER) nsinstall'
     if test `echo "${PATH}" | grep -c \;` = 0; then
         CYGWIN_WRAPPER='sh $(topsrcdir)/build/cygwin-wrapper'
@@ -1012,7 +1013,7 @@ case "$target" in
     PR_MD_ASFILES=os_Darwin.s
 
     # Add Mac OS X support for loading CFM & CFBundle plugins
-    if test -f /System/Library/Frameworks/Carbon.framework/Carbon; then
+    if test -f "${MACOS_SDK_DIR}/System/Library/Frameworks/Carbon.framework/Carbon"; then
         AC_DEFINE(XP_MACOSX)
         OS_TARGET=MacOSX
 
@@ -1625,39 +1626,25 @@ tools are selected during the Xcode/Developer Tools installation.])
     i*86)
 	if test -n "$USE_64"; then
 	    AC_DEFINE(_AMD64_)
-	    AC_DEFINE(_M_AMD64)    
 	else		
 	    AC_DEFINE(_X86_)
 	fi
         ;;
-    alpha)
-	    AC_DEFINE(_ALPHA_)
-   	    ;;
-    mips)
-	    AC_DEFINE(_MIPS_)
-	    ;;
     x86_64)
 	    AC_DEFINE(_AMD64_)
-	    AC_DEFINE(_M_AMD64)
 	    USE_64=1
 	    ;;
     ia64)
 	    AC_DEFINE(_IA64_)
-	    AC_DEFINE(_M_IA64)
 	    USE_64=1
 	    ;;
     *)
 	    AC_DEFINE(_CPU_ARCH_NOT_DEFINED)
 	    ;;
     esac
-
-    if test "$USE_64"; then
-        AC_DEFINE(_WIN64)
-    fi
-
     ;;
 
-*-wince*)
+*-wince*|*-winmo*)
     AC_DEFINE(XP_PC)
     AC_DEFINE(WIN32)
     AC_DEFINE(WINCE)
@@ -2668,7 +2655,7 @@ case "$target" in
         AC_DEFINE(_PR_LOCAL_THREADS_ONLY)
     fi
     ;;
-*-mingw*|*-cygwin*|*-msvc*|*-mks*|*-wince*|*-os2*|*-beos*)
+*-mingw*|*-cygwin*|*-msvc*|*-mks*|*-wince*|*-winmo*|*-os2*|*-beos*)
     dnl win32, wince, os2 & beos cannot use pthreads
     USE_PTHREADS=
     _PTHREAD_LDFLAGS=
