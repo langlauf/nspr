@@ -1,4 +1,4 @@
 repo: a4b34919bf34db2ee22acbbc305693c8980b6dc6
-node: 7f6c18ae404c71b41e8e24504c857ed46ed4c818
-branch: default
-tag: NSPR_4_21_RTM
+node: f370a70149ffa6197cbf472ed6016003a74d49a5
+branch: NSPR_4_21_BRANCH
+tag: NSPR_4_21_1_RTM
